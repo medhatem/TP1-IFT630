@@ -12,111 +12,111 @@ using namespace cppUtils;
 using std::chrono::milliseconds;
 using std::string;
 
-
-bool dining = true;
 Semaphore coutSem(1);
 
-void print(string s){
+void print(const string &s) {
     coutSem.P();
     std::cout << s << std::endl;
     coutSem.V();
 }
 
 
-struct Philosopher{
+Philosopher::Philosopher(const string &name, int id, Chopstick &chopstick1, Chopstick &chopstick2) :
+        name(name), id(id), leftChop(chopstick1), rightChop(chopstick2), thread(&Philosopher::dine, this), dining(true),
+        done(0) {}
 
-    const string name;
-    const int id;
-    Chopstick& leftChop;
-    Chopstick& rightChop;
-    std::thread lifethread;
+void Philosopher::dine() {
+    do {
+        think();
+        eat();
+    } while (dining);
+    done.V();
+}
 
-    Philosopher(const string &name, int id, Chopstick &chopstick1, Chopstick &chopstick2) :
-            name(name), id(id), leftChop(chopstick1), rightChop(chopstick2), lifethread(&Philosopher::dine, this) {}
-    void think(){
-        print(name + " is thinking... ") ;
-        // Think for
-        std::this_thread::sleep_for(milliseconds(random<uint16_t>(400, 600)));
-    }
+void Philosopher::eat() {
+    print(name + " is hungry");
 
-    void eat(){
-        print (name + " is hungry");
+    // On demande les deux baguettes
+    leftChop.pickUP(id);
+    print(name + " picked up left chopstick");
+    rightChop.pickUP(id);
+    print(name + " picked up right chopstick");
+    print(name + " is eating");
+    std::this_thread::sleep_for(milliseconds(1300));
+    // On les dépose
+    leftChop.release();
+    rightChop.release();
+}
 
-        // On demande les deux baguettes
-        leftChop.pickUP(id);
-        print(name + " picked up left chopstick");
-        rightChop.pickUP(id);
-        print(name + " picked up right chopstick");
+void Philosopher::think() {
+    print(name + " is thinking... ");
+    // Think for
+    std::this_thread::sleep_for(milliseconds(random < uint16_t > (1000, 1100)));
+}
 
-        std::this_thread::sleep_for(milliseconds(400));
-        print(name + " is eating");
-
-        // On les dépose
-        leftChop.release();
-        rightChop.release();
-    }
-
-    void dine()
-    {
-        do
-        {
-            think();
-            eat();
-        } while (dining);
-        lifethread.join();
-    }
-
-};
+void Philosopher::leaveTable() {
+    print(name + " is preparing to leave");
+    dining = false;
+    leftChop.release();
+    rightChop.release();
+    done.P();
+    print(name + " left the table");
+    thread.join();
+}
 
 
-void Chopstick::pickUP(int id){
+void Chopstick::pickUP(int id) {
     // Si la demande est faite par qqun d'autre
-    while(owner != id){
+    while (owner != id) {
         // Si le chopstick est sale, c'est que le philosophe l'a déjà utilisé.
-        // Il doit donc le céder
-        if(dirty){
+        // Il doit donc le céder après avoir fini de manger
+        if (dirty) {
             lock.P();
             dirty = false;
             owner = id;
         }
-        // S'il est propre c'est que le philosophe qui l'a présentement n'a pas encore
-        // mangé donc on doit attendre qu'il appelle release
-        else{
+            // S'il est propre c'est que le philosophe qui l'a présentement n'a pas encore
+            // mangé donc on doit attendre qu'il appelle release
+        else {
             lock.P();
         }
     }
-    // Si le philosophe a déjà la possession de la baguette,
-    // pas besoin d'attendre
+    // Si le philosophe a déjà la possession de la baguette et que personne ne l'a demandé, pas d'attente
 }
 
-void Chopstick::release(){
+void Chopstick::release() {
+    // Lorsqu'on a fini avec la baguette, elle devient sale
     dirty = true;
+    // On relâche la sémaphore pour qu'un voisin demandant puisse s'en servir
     lock.V();
 }
 
 Chopstick::Chopstick(int id, int owner) :
-    lock(1), id(id), owner(owner),dirty(true) {}
-    Semaphore sem(0);
+        lock(1), id(id), owner(owner), dirty(true) {}
 
 
-int main(){
+int main() {
 
     Chopstick chopstick1(1, 1);
-    Chopstick chopstick2(2,2);
-    Chopstick chopstick3(3,3);
-    Chopstick chopstick4(4,4);
-    Chopstick chopstick5(5,1);
+    Chopstick chopstick2(2, 2);
+    Chopstick chopstick3(3, 3);
+    Chopstick chopstick4(4, 4);
+    Chopstick chopstick5(5, 1);
 
-    Philosopher phil1("1", 1, chopstick1, chopstick2);
-    Philosopher phil2("2", 2, chopstick2, chopstick3);
-    Philosopher phil3("3", 3, chopstick3, chopstick4);
-    Philosopher phil4("4", 4, chopstick4, chopstick5);
-    Philosopher phil5("5", 5, chopstick5, chopstick1);
+    Philosopher philosophers[5] = {
+            Philosopher("Arendt", 1, chopstick1, chopstick2),
+            Philosopher("Beauvoir", 2, chopstick2, chopstick3),
+            Philosopher("Aspasie", 3, chopstick3, chopstick4),
+            Philosopher("Butler", 4, chopstick4, chopstick5),
+            Philosopher("Hypatie", 5, chopstick5, chopstick1)};
 
     std::this_thread::sleep_for(std::chrono::seconds(10));
-    dining = false;
-    print("Fini");
 
+    for (auto &phil : philosophers) {
+        phil.leaveTable();
+    }
+
+    print("Dinner finished");
     return 0;
 
 
