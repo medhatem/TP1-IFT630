@@ -7,6 +7,8 @@ find_package(Threads REQUIRED)
 
 add_executable(TP1_IFT630 main.cpp)
 add_executable(philo_sem philosophers.cpp)
+add_executable(barber_sem barber.cpp)
 
 target_link_libraries(TP1_IFT630 Threads::Threads)
 target_link_libraries(philo_sem Threads::Threads)
+target_link_libraries(barber_sem Threads::Threads)
